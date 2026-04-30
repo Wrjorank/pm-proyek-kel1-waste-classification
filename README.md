@@ -91,5 +91,6 @@ Dense(6, softmax)
 ```
 
 Training 2 fase:
-- **Fase 1** (15 epoch): base frozen, LR = 1e-3
-- **Fase 2** (15 epoch): 40 layer terakhir dibuka, LR = 1e-5
+- **Fase 1** (50 epoch): base frozen, LR = 1e-3
+- **Fase 2** (50 epoch): 40 layer terakhir dibuka, LR = 1e-5
+- **Total**: 100 epoch
