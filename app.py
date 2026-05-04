@@ -20,6 +20,7 @@ from PIL import Image
 import streamlit as st
 import plotly.graph_objects as go
 import tensorflow as tf
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 
 # ================================================================
@@ -81,8 +82,13 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 # ================================================================
 # KONSTANTA
 # ================================================================
-MODEL_PATH  = "model/waste_mobilenetv2.h5"
+MODEL_PATHS = [
+    "model/waste_mobilenetv2.keras",
+    "model/waste_mobilenetv2.h5",
+]
 IMG_SIZE    = (224, 224)
+AMBIGUOUS_GAP = 0.12
+MIN_CROP_SIZE = 32
 
 # 6 kelas sesuai dataset Garbage Classification Kaggle
 CLASS_INFO = {
@@ -131,10 +137,17 @@ CLASS_NAMES = list(CLASS_INFO.keys())   # urutan harus sama dengan training!
 # LOAD MODEL (di-cache agar tidak reload tiap interaksi)
 # ================================================================
 @st.cache_resource(show_spinner="Memuat model ...")
-def load_model():
-    if not os.path.exists(MODEL_PATH):
+def load_model(model_path: str):
+    if not os.path.exists(model_path):
         return None
-    return tf.keras.models.load_model(MODEL_PATH)
+    return tf.keras.models.load_model(model_path)
+
+
+def find_model_path() -> str:
+    for path in MODEL_PATHS:
+        if os.path.exists(path):
+            return path
+    return MODEL_PATHS[0]
 
 
 # ================================================================
@@ -143,24 +156,44 @@ def load_model():
 def preprocess(image: Image.Image) -> np.ndarray:
     """Konversi gambar ke tensor siap prediksi."""
     image = image.convert("RGB").resize(IMG_SIZE)
-    arr   = np.array(image, dtype=np.float32) / 255.0
+    arr   = preprocess_input(np.array(image, dtype=np.float32))
     return np.expand_dims(arr, axis=0)          # (1, 224, 224, 3)
 
 
 def predict(model, image: Image.Image):
     arr   = preprocess(image)
     probs = model.predict(arr, verbose=0)[0]    # shape (6,)
-    idx   = int(np.argmax(probs))
-    return CLASS_NAMES[idx], float(probs[idx]), probs
+    order = np.argsort(probs)[::-1]
+    top1_idx = int(order[0])
+    top2_idx = int(order[1])
+    return {
+        "pred_class": CLASS_NAMES[top1_idx],
+        "confidence": float(probs[top1_idx]),
+        "second_class": CLASS_NAMES[top2_idx],
+        "second_confidence": float(probs[top2_idx]),
+        "margin": float(probs[top1_idx] - probs[top2_idx]),
+        "order": order,
+        "probs": probs,
+    }
+
+
+def crop_image(image: Image.Image, x_range, y_range) -> Image.Image:
+    left, right = x_range
+    top, bottom = y_range
+    return image.crop((left, top, right, bottom))
 
 
 def confidence_label(conf: float):
     if conf >= 0.80:
-        return "Tinggi ✅", "high"
+        return "Tinggi", "high"
     elif conf >= 0.55:
-        return "Sedang ⚠️", "medium"
+        return "Sedang", "medium"
     else:
-        return "Rendah ❌", "low"
+        return "Rendah", "low"
+
+
+def is_ambiguous(top1_conf: float, top2_conf: float, margin: float) -> bool:
+    return margin < AMBIGUOUS_GAP or (top1_conf < 0.65 and top2_conf > 0.20)
 
 
 # ================================================================
@@ -204,13 +237,14 @@ st.markdown("""
 # ================================================================
 # LOAD MODEL — tampilkan status
 # ================================================================
-model = load_model()
+MODEL_PATH = find_model_path()
+model = load_model(MODEL_PATH)
 
 if model is None:
     st.error(
         f"**Model tidak ditemukan di `{MODEL_PATH}`**\n\n"
         "Jalankan training terlebih dahulu:\n"
-        "```\npython train_model.py\n```"
+        "```\npy -3.13 train_model.py\n```"
     )
     st.stop()
 
@@ -226,7 +260,7 @@ col_left, col_right = st.columns(2, gap="large")
 # ── Kolom kiri: Upload ──────────────────────────────────────────
 with col_left:
     st.subheader("📷 Upload Gambar")
-    st.caption("Format: JPG, JPEG, PNG · Pastikan objek terlihat jelas")
+    st.caption("Format: JPG, JPEG, PNG · Crop objek agar background tidak dominan")
 
     uploaded = st.file_uploader(
         "Pilih gambar",
@@ -234,14 +268,69 @@ with col_left:
         label_visibility= "collapsed",
     )
 
+    img = None
+    image_for_prediction = None
+    crop_enabled = False
+    crop_valid = False
+    crop_w = 0
+    crop_h = 0
+
     if uploaded:
         img = Image.open(uploaded)
-        st.image(img, caption=f"{uploaded.name}", use_column_width=True)
+        crop_enabled = st.toggle("Gunakan crop sebelum prediksi", value=True)
+
+        if crop_enabled:
+            st.caption("Geser area crop sampai objek utama memenuhi sebagian besar frame.")
+            x_range = st.slider(
+                "Area horizontal (kiri - kanan)",
+                min_value = 0,
+                max_value = img.width,
+                value     = (0, img.width),
+            )
+            y_range = st.slider(
+                "Area vertikal (atas - bawah)",
+                min_value = 0,
+                max_value = img.height,
+                value     = (0, img.height),
+            )
+
+            image_for_prediction = crop_image(img, x_range, y_range)
+            crop_w = image_for_prediction.width
+            crop_h = image_for_prediction.height
+            crop_valid = crop_w >= MIN_CROP_SIZE and crop_h >= MIN_CROP_SIZE
+
+            preview_left, preview_right = st.columns(2)
+            preview_left.image(
+                img,
+                caption = f"Asli: {uploaded.name}",
+                use_container_width = True,
+            )
+            preview_right.image(
+                image_for_prediction,
+                caption = "Hasil crop untuk prediksi",
+                use_container_width = True,
+            )
+
+            if not crop_valid:
+                st.warning(
+                    f"Area crop terlalu kecil. Minimal {MIN_CROP_SIZE} x {MIN_CROP_SIZE} px."
+                )
+        else:
+            image_for_prediction = img
+            crop_w = img.width
+            crop_h = img.height
+            crop_valid = True
+            st.image(img, caption=f"{uploaded.name}", use_container_width=True)
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Lebar",  f"{img.width} px")
         c2.metric("Tinggi", f"{img.height} px")
         c3.metric("Format", img.format or uploaded.type.split("/")[-1].upper())
+
+        if crop_enabled:
+            c4, c5 = st.columns(2)
+            c4.metric("Crop W", f"{crop_w} px")
+            c5.metric("Crop H", f"{crop_h} px")
 
 
 # ── Kolom kanan: Hasil ─────────────────────────────────────────
@@ -261,14 +350,27 @@ with col_right:
 
     else:
         if st.button("🔍  Prediksi Sekarang", type="primary",
-                     use_container_width=True):
+                     use_container_width=True, disabled=not crop_valid):
 
             with st.spinner("Menganalisis gambar ..."):
                 time.sleep(0.3)
-                pred_class, confidence, all_probs = predict(model, img)
+                result = predict(model, image_for_prediction)
+
+            pred_class   = result["pred_class"]
+            confidence   = result["confidence"]
+            all_probs    = result["probs"]
+            second_class = result["second_class"]
+            second_conf  = result["second_confidence"]
+            margin       = result["margin"]
 
             info        = CLASS_INFO[pred_class]
+            second_info = CLASS_INFO[second_class]
             level, css  = confidence_label(confidence)
+
+            if crop_enabled:
+                st.caption(
+                    f"Prediksi memakai hasil crop berukuran {crop_w} x {crop_h} px."
+                )
 
             # ── Kotak hasil utama ──
             st.markdown(f"""
@@ -280,6 +382,25 @@ with col_right:
                 </span>
             </div>
             """, unsafe_allow_html=True)
+
+            st.markdown("**Top-2 kandidat:**")
+            top_left, top_right = st.columns(2)
+            top_left.metric(
+                "Top-1",
+                f"{info['emoji']} {info['label']} ({confidence:.1%})",
+            )
+            top_right.metric(
+                "Top-2",
+                f"{second_info['emoji']} {second_info['label']} ({second_conf:.1%})",
+            )
+            st.caption(f"Selisih confidence top-1 vs top-2: {margin:.1%}")
+
+            if is_ambiguous(confidence, second_conf, margin):
+                st.warning(
+                    f"Hasil masih ambigu antara **{info['label']} ({confidence:.1%})** "
+                    f"dan **{second_info['label']} ({second_conf:.1%})**. "
+                    "Coba crop lebih rapat ke objek atau gunakan foto dengan background yang lebih netral."
+                )
 
             # ── Tips penanganan ──
             st.markdown(
