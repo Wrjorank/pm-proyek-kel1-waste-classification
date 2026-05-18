@@ -146,6 +146,7 @@ def print_split_summary(classes, train_df, val_df):
 def build_generators(train_df, val_df, classes):
     print("\nMenyiapkan data generator ...")
 
+    # Generator training dengan augmentasi agar model lebih robust terhadap variasi gambar.
     train_gen = ImageDataGenerator(
         preprocessing_function=preprocess_input,
         rotation_range=20,
@@ -208,6 +209,8 @@ def build_class_weights(train_df, class_indices):
 # ================================================================
 # Model
 # ================================================================
+# Model dibuat dengan MobileNetV2 sebagai feature extractor.
+# Bagian atas (head) dibuat ulang untuk klasifikasi 6 kelas sampah.
 def build_model(num_classes):
     """Bangun model transfer learning dengan MobileNetV2 dan head kustom."""
     print("\nMembangun model ...")
@@ -376,7 +379,7 @@ def save_confusion_matrix(cm, class_labels):
 # ================================================================
 # Main
 # ================================================================
-# Jalankan semua langkah: scan dataset, buat generator, training, dan evaluasi.
+# Alur utama skrip: scan dataset, split data, training, fine-tune, evaluasi, dan simpan plot.
 classes, class_counts, dataset_df = scan_dataset()
 train_df, val_df = split_dataset(dataset_df)
 print_split_summary(classes, train_df, val_df)
@@ -404,6 +407,7 @@ histories = [hist1]
 phase1_len = len(hist1.history["accuracy"])
 
 if EPOCHS_2 > 0 and UNFREEZE_LAST > 0:
+    # Fine-tuning: buka beberapa layer akhir dari MobileNetV2 agar model bisa belajar fitur spesifik dataset.
     print("\n" + "=" * 60)
     print(f"  FASE 2: Fine-tuning ({UNFREEZE_LAST} layer terakhir)")
     print(f"  Epochs: {EPOCHS_2}  |  LR: {LR_2}")
@@ -427,6 +431,7 @@ if EPOCHS_2 > 0 and UNFREEZE_LAST > 0:
     histories.append(hist2)
 
 history = merge_histories(histories)
+# Simpan riwayat training ke file .npy agar bisa dianalisis ulang tanpa melatih kembali.
 np.save(os.path.join("model", "training_history.npy"), history)
 
 best_epoch = int(np.argmax(history["val_accuracy"])) + 1
@@ -434,6 +439,7 @@ best_val_acc = float(np.max(history["val_accuracy"]))
 print(f"\nBest validation accuracy: {best_val_acc:.4f} pada epoch {best_epoch}")
 
 print("\nMemuat checkpoint terbaik dari training ...")
+# Pastikan kita menggunakan model terbaik yang disimpan oleh ModelCheckpoint untuk evaluasi.
 best_model = tf.keras.models.load_model(MODEL_PATH)
 
 print("\n" + "=" * 60)

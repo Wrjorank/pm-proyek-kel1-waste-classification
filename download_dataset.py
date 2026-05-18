@@ -54,6 +54,7 @@ def setup_kaggle():
 # ── Langkah 2: Install & import kaggle library ───────────────
 # Pastikan dependency Kaggle API tersedia sebelum download dataset.
 def install_kaggle():
+    """Pastikan modul kaggle terinstall, install otomatis jika belum."""
     try:
         import kaggle
         return kaggle
@@ -67,6 +68,7 @@ def install_kaggle():
 # ── Langkah 3: Download dataset ──────────────────────────────
 # Unduh file zip dari Kaggle dan kembalikan path zip yang selesai didownload.
 def download(kaggle):
+    """Unduh file arsip dataset dari Kaggle ke folder downloads/."""
     DOWNLOAD_DIR.mkdir(exist_ok=True)
     print(f"\n📥 Mendownload dataset ({KAGGLE_DATASET}) ...")
     print("   Ukuran sekitar 75 MB, mohon tunggu ...\n")
@@ -86,6 +88,7 @@ def download(kaggle):
 # ── Langkah 4: Ekstrak zip ───────────────────────────────────
 # Buka file zip hasil download dan ekstrak seluruh isinya ke folder sementara.
 def extract(zip_path: Path):
+    """Ekstrak file zip dataset ke folder downloads/ sementara."""
     print(f"\n📦 Mengekstrak {zip_path.name} ...")
     with zipfile.ZipFile(zip_path, "r") as z:
         z.extractall(DOWNLOAD_DIR)
@@ -95,6 +98,7 @@ def extract(zip_path: Path):
 # ── Langkah 5: Susun folder dataset/ ─────────────────────────
 # Temukan setiap folder kelas hasil ekstrak dan salin gambar ke struktur dataset/.
 def organize():
+    """Pindahkan gambar dari hasil ekstrak ke struktur folder dataset/<kelas>."""
     print("\n🗂️  Menyusun folder dataset/ ...")
 
     # Cari folder kelas di dalam hasil ekstrak
@@ -104,7 +108,7 @@ def organize():
             found.append(item)
 
     if not found:
-        # Fallback: tampilkan semua folder untuk debug
+        # Jika struktur folder tidak sesuai, tampilkan semua folder yang ditemukan untuk debugging.
         print("   ⚠️  Folder kelas tidak langsung ditemukan, mencari ...")
         for item in DOWNLOAD_DIR.rglob("*"):
             if item.is_dir():
@@ -146,6 +150,7 @@ def verify():
 
 
 # ── Main ──────────────────────────────────────────────────────
+# Jalankan alur download dataset secara berurutan: cek token, download, ekstrak, susun, verifikasi.
 if __name__ == "__main__":
     print("=" * 56)
     print("  DOWNLOAD DATASET: Garbage Classification (Kaggle)")

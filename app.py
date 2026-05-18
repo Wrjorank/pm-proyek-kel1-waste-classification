@@ -248,10 +248,12 @@ st.markdown("""
 # ================================================================
 # LOAD MODEL — tampilkan status
 # ================================================================
+# Cari model yang tersedia dan muat sekali saja untuk performa yang lebih baik.
 MODEL_PATH = find_model_path()
 model = load_model(MODEL_PATH)
 
 if model is None:
+    # Jika model tidak ditemukan, tampilkan pesan error dan hentikan aplikasi.
     st.error(
         f"**Model tidak ditemukan di `{MODEL_PATH}`**\n\n"
         "Jalankan training terlebih dahulu:\n"
@@ -280,6 +282,7 @@ with col_left:
         label_visibility= "collapsed",
     )
 
+    # Inisialisasi variabel kontrol upload dan crop.
     img = None
     image_for_prediction = None
     crop_enabled = False
@@ -362,6 +365,7 @@ with col_right:
         """, unsafe_allow_html=True)
 
     else:
+        # Tombol untuk menjalankan prediksi setelah gambar siap.
         if st.button("🔍  Prediksi Sekarang", type="primary",
                      use_container_width=True, disabled=not crop_valid):
 
