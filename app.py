@@ -26,12 +26,14 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 # ================================================================
 # KONFIGURASI HALAMAN
 # ================================================================
+# Konfigurasi tampilan Streamlit: judul halaman, ikon, dan tata letak.
 st.set_page_config(
     page_title = "Waste Classifier",
     page_icon  = "♻️",
     layout     = "wide",
 )
 
+# CSS kustom untuk mempercantik tampilan aplikasi.
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
@@ -136,6 +138,8 @@ CLASS_NAMES = list(CLASS_INFO.keys())   # urutan harus sama dengan training!
 # ================================================================
 # LOAD MODEL (di-cache agar tidak reload tiap interaksi)
 # ================================================================
+# Fungsi ini memuat model dari disk dan menyimpannya di cache Streamlit
+# agar tidak melakukan reload model berulang kali saat halaman disegarkan.
 @st.cache_resource(show_spinner="Memuat model ...")
 def load_model(model_path: str):
     if not os.path.exists(model_path):
@@ -153,6 +157,8 @@ def find_model_path() -> str:
 # ================================================================
 # FUNGSI PREDIKSI
 # ================================================================
+# Semua fungsi di bawah ini dipakai untuk mempersiapkan gambar,
+# melakukan prediksi, dan menilai kekuatan confidence.
 def preprocess(image: Image.Image) -> np.ndarray:
     """Konversi gambar ke tensor siap prediksi."""
     image = image.convert("RGB").resize(IMG_SIZE)
@@ -161,6 +167,7 @@ def preprocess(image: Image.Image) -> np.ndarray:
 
 
 def predict(model, image: Image.Image):
+    """Lakukan prediksi kelas dari gambar yang sudah diproses."""
     arr   = preprocess(image)
     probs = model.predict(arr, verbose=0)[0]    # shape (6,)
     order = np.argsort(probs)[::-1]
@@ -178,12 +185,14 @@ def predict(model, image: Image.Image):
 
 
 def crop_image(image: Image.Image, x_range, y_range) -> Image.Image:
+    """Potong gambar berdasarkan rentang koordinat yang dipilih pengguna."""
     left, right = x_range
     top, bottom = y_range
     return image.crop((left, top, right, bottom))
 
 
 def confidence_label(conf: float):
+    """Tentukan label teks untuk tingkat confidence prediksi."""
     if conf >= 0.80:
         return "Tinggi", "high"
     elif conf >= 0.55:
@@ -193,12 +202,14 @@ def confidence_label(conf: float):
 
 
 def is_ambiguous(top1_conf: float, top2_conf: float, margin: float) -> bool:
+    """Periksa apakah hasil prediksi masih ambigu berdasarkan selisih confidence."""
     return margin < AMBIGUOUS_GAP or (top1_conf < 0.65 and top2_conf > 0.20)
 
 
 # ================================================================
 # SIDEBAR
 # ================================================================
+# Panel samping berisi info kelas, detail model, dan konteks aplikasi.
 with st.sidebar:
     st.markdown("## ♻️ Waste Classifier")
     st.caption("MobileNetV2 · Transfer Learning · TensorFlow")
@@ -258,6 +269,7 @@ st.divider()
 col_left, col_right = st.columns(2, gap="large")
 
 # ── Kolom kiri: Upload ──────────────────────────────────────────
+# Bagian kiri untuk memilih gambar, melihat preview, dan mengatur crop.
 with col_left:
     st.subheader("📷 Upload Gambar")
     st.caption("Format: JPG, JPEG, PNG · Crop objek agar background tidak dominan")
@@ -334,6 +346,7 @@ with col_left:
 
 
 # ── Kolom kanan: Hasil ─────────────────────────────────────────
+# Bagian kanan menampilkan hasil prediksi jika gambar sudah diupload.
 with col_right:
     st.subheader("🤖 Hasil Prediksi")
 

@@ -42,6 +42,7 @@ print("=" * 60)
 # ================================================================
 # Config
 # ================================================================
+# Semua parameter utama untuk dataset, model, dan proses training.
 DATASET_DIR = "dataset"
 MODEL_PATH = "model/waste_mobilenetv2.keras"
 PLOTS_DIR = "plots"
@@ -67,6 +68,7 @@ os.makedirs(PLOTS_DIR, exist_ok=True)
 # Dataset
 # ================================================================
 def scan_dataset():
+    """Scan folder dataset dan buat tabel path gambar + label."""
     if not os.path.isdir(DATASET_DIR):
         raise FileNotFoundError(
             f"Folder '{DATASET_DIR}' tidak ada.\n"
@@ -114,6 +116,7 @@ def scan_dataset():
 
 
 def split_dataset(dataset_df):
+    """Bagi dataset menjadi training dan validasi secara stratified."""
     train_df, val_df = train_test_split(
         dataset_df,
         test_size=VAL_SPLIT,
@@ -206,6 +209,7 @@ def build_class_weights(train_df, class_indices):
 # Model
 # ================================================================
 def build_model(num_classes):
+    """Bangun model transfer learning dengan MobileNetV2 dan head kustom."""
     print("\nMembangun model ...")
 
     base = MobileNetV2(
@@ -242,6 +246,7 @@ def compile_model(model, learning_rate):
 
 
 def make_callbacks():
+    """Sediakan callback untuk early stopping, checkpoint, dan penurunan learning rate."""
     return [
         EarlyStopping(
             monitor="val_accuracy",
@@ -280,6 +285,7 @@ def merge_histories(histories):
 # Visualization
 # ================================================================
 def save_class_distribution(counts):
+    """Simpan plot distribusi dataset per kelas ke folder plots/."""
     fig, ax = plt.subplots(figsize=(10, 4))
     colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"]
     bars = ax.bar(counts.keys(), counts.values(), color=colors, edgecolor="white", linewidth=1.5)
@@ -305,6 +311,7 @@ def save_class_distribution(counts):
 
 
 def save_training_history(history, phase1_len):
+    """Simpan grafik akurasi dan loss training/validasi."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     fig.suptitle("Training History - MobileNetV2 Waste Classification", fontsize=13, fontweight="bold")
 
@@ -330,6 +337,7 @@ def save_training_history(history, phase1_len):
 
 
 def save_confusion_matrix(cm, class_labels):
+    """Simpan confusion matrix dalam bentuk absolut dan normalisasi."""
     cm_norm = cm.astype("float") / cm.sum(axis=1, keepdims=True)
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
@@ -365,6 +373,10 @@ def save_confusion_matrix(cm, class_labels):
 # ================================================================
 # Main
 # ================================================================
+# ================================================================
+# Main
+# ================================================================
+# Jalankan semua langkah: scan dataset, buat generator, training, dan evaluasi.
 classes, class_counts, dataset_df = scan_dataset()
 train_df, val_df = split_dataset(dataset_df)
 print_split_summary(classes, train_df, val_df)

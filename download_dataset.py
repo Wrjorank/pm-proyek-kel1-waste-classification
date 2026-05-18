@@ -18,6 +18,7 @@ from pathlib import Path
 
 
 # ── Konfigurasi ──────────────────────────────────────────────
+# Nama dataset, lokasi download sementara, dan direktori target dataset.
 KAGGLE_DATASET = "asdasdasasdas/garbage-classification"
 DOWNLOAD_DIR   = Path("downloads")
 DATASET_DIR    = Path("dataset")
@@ -25,6 +26,7 @@ CLASSES        = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
 
 # ── Langkah 1: Pastikan kaggle.json tersedia ─────────────────
+# Periksa apakah token Kaggle ada di folder proyek; jika tidak, salin ke ~/.kaggle/.
 def setup_kaggle():
     kaggle_dir  = Path.home() / ".kaggle"
     kaggle_file = kaggle_dir / "kaggle.json"
@@ -50,6 +52,7 @@ def setup_kaggle():
 
 
 # ── Langkah 2: Install & import kaggle library ───────────────
+# Pastikan dependency Kaggle API tersedia sebelum download dataset.
 def install_kaggle():
     try:
         import kaggle
@@ -62,6 +65,7 @@ def install_kaggle():
 
 
 # ── Langkah 3: Download dataset ──────────────────────────────
+# Unduh file zip dari Kaggle dan kembalikan path zip yang selesai didownload.
 def download(kaggle):
     DOWNLOAD_DIR.mkdir(exist_ok=True)
     print(f"\n📥 Mendownload dataset ({KAGGLE_DATASET}) ...")
@@ -80,6 +84,7 @@ def download(kaggle):
 
 
 # ── Langkah 4: Ekstrak zip ───────────────────────────────────
+# Buka file zip hasil download dan ekstrak seluruh isinya ke folder sementara.
 def extract(zip_path: Path):
     print(f"\n📦 Mengekstrak {zip_path.name} ...")
     with zipfile.ZipFile(zip_path, "r") as z:
@@ -88,6 +93,7 @@ def extract(zip_path: Path):
 
 
 # ── Langkah 5: Susun folder dataset/ ─────────────────────────
+# Temukan setiap folder kelas hasil ekstrak dan salin gambar ke struktur dataset/.
 def organize():
     print("\n🗂️  Menyusun folder dataset/ ...")
 
@@ -124,6 +130,7 @@ def organize():
 
 
 # ── Langkah 6: Verifikasi ─────────────────────────────────────
+# Tampilkan ringkasan jumlah gambar per kelas untuk memastikan dataset lengkap.
 def verify():
     print("\n📊 Verifikasi dataset:")
     print("   " + "─" * 36)
